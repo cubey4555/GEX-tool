@@ -186,7 +186,7 @@ now = datetime.datetime.now()
 minute_slot = (now.minute // 30) * 30
 snapshot_time = now.replace(minute=minute_slot, second=0, microsecond=0)
 
-# Filename includes date so it doesn't overwrite each day
+# Filename always includes date and time (YYYYMMDD_HHMM)
 snapshot_filename = f"{symbol}_{snapshot_time.strftime('%Y%m%d_%H%M')}.csv"
 snapshot_path = os.path.join(SNAPSHOT_DIR, snapshot_filename)
 
@@ -199,14 +199,14 @@ st.subheader("📁 Historical GEX Snapshots")
 snapshot_files = sorted(os.listdir(SNAPSHOT_DIR))
 
 for file in snapshot_files:
-    # Parse display time safely
-    try:
-        time_str = file.split("_")[1].replace(".csv","")
-        # New-style YYYYMMDDHHMM
-        display_time = datetime.datetime.strptime(time_str, "%Y%m%d%H%M")
-        display_time_str = display_time.strftime("%b %d, %I:%M %p")
-    except:
-        display_time_str = file
+    # Skip any old-style HHMM-only files just in case
+    if len(file.split("_")[1].replace(".csv","")) != 12:
+        continue
+    
+    # Parse display time
+    time_str = file.split("_")[1].replace(".csv","")
+    display_time = datetime.datetime.strptime(time_str, "%Y%m%d%H%M")
+    display_time_str = display_time.strftime("%b %d, %I:%M %p")
 
     df_snapshot = pd.read_csv(os.path.join(SNAPSHOT_DIR, file))
     
