@@ -173,58 +173,53 @@ st.write(f"Power Score: {power_score:.2%}")
 st.write(f"Directional Bias: {direction_bias}")
 st.write(f"Predicted Close: {predicted_close:.2f}")
 
-# --- Imports ---
+# --- Imports for snapshots and autorefresh ---
 import os
 import datetime
-import pandas as pd
-import plotly.graph_objects as go
-import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
 # --- Snapshot folder ---
 SNAPSHOT_DIR = "snapshots"
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 
-# --- Current snapshot (every 30 minutes) ---
-# Adjust to your timezone: e.g., UTC-4 for EDT
-timezone_offset = -4
-now_utc = datetime.datetime.utcnow()
-now = now_utc + datetime.timedelta(hours=timezone_offset)
+# --- Auto-refresh every 1 minute ---
+st_autorefresh(interval=60 * 1000, key="snapshot_refresh")  # 60,000 ms = 1 minute
 
-minute_slot = now.minute  # each minute is a new slot
-snapshot_time = now.replace(second=0, microsecond=0)
+# --- Current time and snapshot filename ---
+now = datetime.datetime.now()
+minute_slot = (now.minute // 1) * 1  # 1-minute slot for testing
+snapshot_time = now.replace(minute=minute_slot, second=0, microsecond=0)
 
-# Filename includes date and time
+# Include date in filename so it resets every day
 snapshot_filename = f"{symbol}_{snapshot_time.strftime('%Y%m%d_%H%M')}.csv"
 snapshot_path = os.path.join(SNAPSHOT_DIR, snapshot_filename)
 
-# Save only if it doesn't exist
+# Only save if it doesn't already exist
 if not os.path.exists(snapshot_path):
     df_total.to_csv(snapshot_path, index=False)
 
-# --- Display today's snapshots only ---
+# --- Display historical snapshots (only today) ---
 st.subheader("📁 Historical GEX Snapshots (Today)")
-today_str = now.strftime("%Y%m%d")
-
 snapshot_files = sorted(os.listdir(SNAPSHOT_DIR))
-snapshot_files_today = [
-    f for f in snapshot_files
-    if f.startswith(symbol) and f.split("_")[1].startswith(today_str)
-]
 
-# Display snapshots for today only
-for file in snapshot_files_today:
-    try:
-        # Parse correct time format
-        time_str = file.split("_")[1].replace(".csv","")
-        display_time = datetime.datetime.strptime(time_str, "%Y%m%d%H%M")
-        display_time_str = display_time.strftime("%b %d, %I:%M %p")
-    except:
-        display_time_str = file
+for file in snapshot_files:
+    # Skip snapshots from previous days
+    if not file.startswith(symbol):
+        continue
+    date_str = file.split("_")[1]  # YYYYMMDDHHMM
+    if len(date_str) != 12:
+        continue  # skip malformed files
+
+    file_date = datetime.datetime.strptime(date_str, "%Y%m%d%H%M")
+    if file_date.date() != now.date():
+        continue  # only show today's snapshots
+
+    display_time_str = file_date.strftime("%I:%M %p")  # readable time
 
     df_snapshot = pd.read_csv(os.path.join(SNAPSHOT_DIR, file))
     
     fig_snap = go.Figure()
-    colors = ["green" if val>=0 else "red" for val in df_snapshot["net_gex"]]
+    colors = ["green" if val >= 0 else "red" for val in df_snapshot["net_gex"]]
     fig_snap.add_trace(go.Bar(
         x=df_snapshot["strike"],
         y=df_snapshot["net_gex"],
@@ -245,6 +240,7 @@ for file in snapshot_files_today:
         font=dict(color="white")
     )
     st.plotly_chart(fig_snap, use_container_width=True)
+
 
 
 
