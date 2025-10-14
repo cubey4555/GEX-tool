@@ -14,8 +14,7 @@ import numpy as np
 from scipy.stats import norm
 import plotly.graph_objects as go
 import streamlit as st
-import os
-import datetime
+
 
 st.set_page_config(page_title="SPX/SPY GEX Dashboard", layout="wide")
 st.title("📊 SPX/SPY GEX Dashboard (Interactive)")
@@ -123,18 +122,6 @@ df_total["total_oi"] = df_total["oi_call"] + df_total["oi_put"]
 
 total_gamma_abs = df_total["abs_gex"].sum()
 total_net_gamma = df_total["net_gex"].sum()
-SNAPSHOT_DIR = "snapshots"
-os.makedirs(SNAPSHOT_DIR, exist_ok=True)
-# --- Save snapshot every 30 minutes ---
-now = datetime.datetime.now()
-minute_slot = (now.minute // 30) * 30
-snapshot_time = now.replace(minute=minute_slot, second=0, microsecond=0)
-snapshot_filename = f"{symbol}_{snapshot_time.strftime('%H%M')}.csv"
-snapshot_path = os.path.join(SNAPSHOT_DIR, snapshot_filename)
-
-# Only save if it doesn't already exist
-if not os.path.exists(snapshot_path):
-    df_total.to_csv(snapshot_path, index=False)
 
 # --- Power Zone ---
 abs_gex_sum = df_total["abs_gex"].sum()
@@ -186,12 +173,36 @@ st.write(f"Power Score: {power_score:.2%}")
 st.write(f"Directional Bias: {direction_bias}")
 st.write(f"Predicted Close: {predicted_close:.2f}")
 
+# --- Historical Snapshots ---
+import os
+import datetime
+
+# Folder to save snapshots
+SNAPSHOT_DIR = "snapshots"
+os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+
+# Current time rounded down to nearest 30 minutes
+now = datetime.datetime.now()
+minute_slot = (now.minute // 30) * 30
+snapshot_time = now.replace(minute=minute_slot, second=0, microsecond=0)
+
+# Filename (safe for filesystem)
+snapshot_filename = f"{symbol}_{snapshot_time.strftime('%Y%m%d_%H%M')}.csv"
+snapshot_path = os.path.join(SNAPSHOT_DIR, snapshot_filename)
+
+# Only save if it doesn't already exist
+if not os.path.exists(snapshot_path):
+    df_total.to_csv(snapshot_path, index=False)
+
+# Display historical snapshots
 st.subheader("Historical GEX Snapshots")
 snapshot_files = sorted(os.listdir(SNAPSHOT_DIR))
+
 for file in snapshot_files:
     df_snapshot = pd.read_csv(os.path.join(SNAPSHOT_DIR, file))
     fig_snap = go.Figure()
-    colors = ["green" if val>=0 else "red" for val in df_snapshot["net_gex"]]
+    colors = ["green" if val >= 0 else "red" for val in df_snapshot["net_gex"]]
+    
     fig_snap.add_trace(go.Bar(
         x=df_snapshot["strike"], 
         y=df_snapshot["net_gex"], 
@@ -203,11 +214,18 @@ for file in snapshot_files:
         mode="lines+markers",
         line=dict(color="purple", width=2)
     ))
+
+    # Nicely formatted time for display
+    display_time = datetime.datetime.strptime(file.split("_")[1].replace(".csv",""), "%Y%m%d_%H%M")
+    display_time_str = display_time.strftime("%b %d, %I:%M %p")
+
     fig_snap.update_layout(
-        title=f"GEX Snapshot: {file.replace('.csv','')}", 
+        title=f"GEX Snapshot: {display_time_str}", 
         xaxis_title="Strike Price", 
         yaxis_title="GEX / OI",
-        paper_bgcolor="black", plot_bgcolor="black", font=dict(color="white")
+        paper_bgcolor="black", 
+        plot_bgcolor="black", 
+        font=dict(color="white")
     )
     st.plotly_chart(fig_snap, use_container_width=True)
 
