@@ -190,8 +190,8 @@ timezone_offset = -4
 now_utc = datetime.datetime.utcnow()
 now = now_utc + datetime.timedelta(hours=timezone_offset)
 
-minute_slot = (now.minute // 30) * 30
-snapshot_time = now.replace(minute=minute_slot, second=0, microsecond=0)
+minute_slot = now.minute  # each minute is a new slot
+snapshot_time = now.replace(second=0, microsecond=0)
 
 # Filename includes date and time
 snapshot_filename = f"{symbol}_{snapshot_time.strftime('%Y%m%d_%H%M')}.csv"
