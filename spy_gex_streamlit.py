@@ -179,59 +179,53 @@ import datetime
 
 # --- Snapshot folder ---
 SNAPSHOT_DIR = "snapshots"
-os.makedirs(SNAPSHOT_DIR, exist_ok=True)  # create folder if it doesn't exist
+os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 
-# --- Save snapshot every 30 minutes ---
-now = datetime.datetime.now()
-minute_slot = (now.minute // 30) * 30  # rounds down to nearest 30-min mark
+# --- Save snapshot every 30 minutes using UTC but convert to desired local time if needed ---
+# Adjust to your timezone: e.g., UTC-4 for EDT
+timezone_offset = -4  # change to your offset
+now_utc = datetime.datetime.utcnow()
+now = now_utc + datetime.timedelta(hours=timezone_offset)
+
+# Round down to nearest 30 minutes
+minute_slot = (now.minute // 30) * 30
 snapshot_time = now.replace(minute=minute_slot, second=0, microsecond=0)
 
-# Include date in filename (so each day is separate)
-snapshot_filename = f"{symbol}_{snapshot_time.strftime('%Y%m%d%H%M')}.csv"
+# Filename with date + time (unique per 30-min slot)
+snapshot_filename = f"{symbol}_{snapshot_time.strftime('%Y%m%d_%H%M')}.csv"
 snapshot_path = os.path.join(SNAPSHOT_DIR, snapshot_filename)
 
-# Save CSV only if it doesn't already exist
+# Save only if it doesn't already exist
 if not os.path.exists(snapshot_path):
     df_total.to_csv(snapshot_path, index=False)
 
 # --- Display historical snapshots ---
 st.subheader("📁 Historical GEX Snapshots")
-snapshot_files = sorted(os.listdir(SNAPSHOT_DIR))  # list all files
+snapshot_files = sorted(os.listdir(SNAPSHOT_DIR))
 
 for file in snapshot_files:
-    file_path = os.path.join(SNAPSHOT_DIR, file)
-    
-    if not file.endswith(".csv"):
-        continue  # skip non-csv files
-    
-    # Parse display time safely
     try:
         time_str = file.split("_")[1].replace(".csv","")
-        display_time = datetime.datetime.strptime(time_str, "%Y%m%d%H%M")
+        display_time = datetime.datetime.strptime(time_str, "%Y%m%d_%H%M")
         display_time_str = display_time.strftime("%b %d, %I:%M %p")
     except:
-        display_time_str = file  # fallback to filename if parsing fails
+        display_time_str = file
 
-    # Load the snapshot CSV
-    df_snapshot = pd.read_csv(file_path)
+    df_snapshot = pd.read_csv(os.path.join(SNAPSHOT_DIR, file))
     
-    # Build the Plotly chart for this snapshot
     fig_snap = go.Figure()
-    
-    colors = ["green" if val >= 0 else "red" for val in df_snapshot["net_gex"]]
+    colors = ["green" if val>=0 else "red" for val in df_snapshot["net_gex"]]
     fig_snap.add_trace(go.Bar(
         x=df_snapshot["strike"],
         y=df_snapshot["net_gex"],
         marker_color=colors
     ))
-    
     fig_snap.add_trace(go.Scatter(
         x=df_snapshot["strike"],
         y=df_snapshot["abs_gex"],
         mode="lines+markers",
         line=dict(color="purple", width=2)
     ))
-    
     fig_snap.update_layout(
         title=f"GEX Snapshot: {display_time_str}",
         xaxis_title="Strike Price",
@@ -240,7 +234,6 @@ for file in snapshot_files:
         plot_bgcolor="black",
         font=dict(color="white")
     )
-    
-    # Display snapshot in Streamlit
     st.plotly_chart(fig_snap, use_container_width=True)
+
 
