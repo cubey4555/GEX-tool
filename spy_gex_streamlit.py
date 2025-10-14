@@ -17,6 +17,12 @@ import streamlit as st
 
 st.set_page_config(page_title="SPX/SPY GEX Dashboard", layout="wide")
 st.title("📊 SPX/SPY GEX Dashboard (Interactive)")
+from streamlit_autorefresh import st_autorefresh
+from datetime import datetime
+import os
+
+# Auto-refresh every 30 minutes (1800 seconds)
+st_autorefresh(interval=30*60*1000, key="gex_refresh")
 
 # --- User inputs ---
 symbol = st.text_input("Enter ticker symbol (e.g., SPY, TSLA):", value="SPY").upper()
@@ -161,6 +167,13 @@ fig.add_vrect(x0=power_lower, x1=power_upper, fillcolor="purple", opacity=0.15, 
 fig.add_vline(x=power_center, line=dict(color="magenta", width=2, dash="dashdot"), annotation_text="Power Zone", annotation_position="top")
 fig.update_layout(title=f"{symbol} GEX Dashboard", xaxis_title="Strike Price", yaxis_title="GEX / OI", paper_bgcolor="black", plot_bgcolor="black", font=dict(color="white"))
 st.plotly_chart(fig, use_container_width=True)
+# --- Save snapshot of the graph ---
+os.makedirs("snapshots", exist_ok=True)  # Create folder if not exists
+timestamp = datetime.now().strftime("%H-%M")  # e.g., 10-30
+snapshot_path = f"snapshots/gex_{timestamp}.png"
+
+import plotly.io as pio
+pio.write_image(fig, snapshot_path)
 
 # --- Summary metrics ---
 st.subheader("Summary Metrics")
@@ -171,3 +184,14 @@ st.write(f"Power Zone Band: [{power_lower:.2f}, {power_upper:.2f}]")
 st.write(f"Power Score: {power_score:.2%}")
 st.write(f"Directional Bias: {direction_bias}")
 st.write(f"Predicted Close: {predicted_close:.2f}")
+
+
+
+# --- Display historical snapshots ---
+import glob
+
+st.subheader("GEX History Snapshots (Today)")
+image_files = sorted(glob.glob("snapshots/*.png"))
+for img_path in image_files:
+    time_label = img_path.split("_")[1].replace(".png","")
+    st.image(img_path, caption=f"{time_label} update", use_column_width=True)
