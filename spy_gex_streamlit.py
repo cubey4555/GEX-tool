@@ -173,40 +173,50 @@ st.write(f"Power Score: {power_score:.2%}")
 st.write(f"Directional Bias: {direction_bias}")
 st.write(f"Predicted Close: {predicted_close:.2f}")
 
-# --- Imports for snapshots ---
+# --- Imports ---
 import os
 import datetime
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
 
 # --- Snapshot folder ---
 SNAPSHOT_DIR = "snapshots"
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 
-# --- Save snapshot every 30 minutes using UTC but convert to desired local time if needed ---
+# --- Current snapshot (every 30 minutes) ---
 # Adjust to your timezone: e.g., UTC-4 for EDT
-timezone_offset = -4  # change to your offset
+timezone_offset = -4
 now_utc = datetime.datetime.utcnow()
 now = now_utc + datetime.timedelta(hours=timezone_offset)
 
-# Round down to nearest 30 minutes
 minute_slot = (now.minute // 30) * 30
 snapshot_time = now.replace(minute=minute_slot, second=0, microsecond=0)
 
-# Filename with date + time (unique per 30-min slot)
+# Filename includes date and time
 snapshot_filename = f"{symbol}_{snapshot_time.strftime('%Y%m%d_%H%M')}.csv"
 snapshot_path = os.path.join(SNAPSHOT_DIR, snapshot_filename)
 
-# Save only if it doesn't already exist
+# Save only if it doesn't exist
 if not os.path.exists(snapshot_path):
     df_total.to_csv(snapshot_path, index=False)
 
-# --- Display historical snapshots ---
-st.subheader("📁 Historical GEX Snapshots")
-snapshot_files = sorted(os.listdir(SNAPSHOT_DIR))
+# --- Display today's snapshots only ---
+st.subheader("📁 Historical GEX Snapshots (Today)")
+today_str = now.strftime("%Y%m%d")
 
-for file in snapshot_files:
+snapshot_files = sorted(os.listdir(SNAPSHOT_DIR))
+snapshot_files_today = [
+    f for f in snapshot_files
+    if f.startswith(symbol) and f.split("_")[1].startswith(today_str)
+]
+
+# Display snapshots for today only
+for file in snapshot_files_today:
     try:
+        # Parse correct time format
         time_str = file.split("_")[1].replace(".csv","")
-        display_time = datetime.datetime.strptime(time_str, "%Y%m%d_%H%M")
+        display_time = datetime.datetime.strptime(time_str, "%Y%m%d%H%M")
         display_time_str = display_time.strftime("%b %d, %I:%M %p")
     except:
         display_time_str = file
@@ -235,5 +245,6 @@ for file in snapshot_files:
         font=dict(color="white")
     )
     st.plotly_chart(fig_snap, use_container_width=True)
+
 
 
