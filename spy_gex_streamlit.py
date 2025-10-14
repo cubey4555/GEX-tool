@@ -14,8 +14,11 @@ import numpy as np
 from scipy.stats import norm
 import plotly.graph_objects as go
 import streamlit as st
-minute_slot = (now.minute // 30) * 30
-snapshot_time = now.replace(minute=minute_slot, second=0, microsecond=0)
+import os
+import datetime
+now = datetime.datetime.now()
+minute_slot = now.minute
+snapshot_time = now.replace(second=0, microsecond=0)
 
 
 st.set_page_config(page_title="SPX/SPY GEX Dashboard", layout="wide")
