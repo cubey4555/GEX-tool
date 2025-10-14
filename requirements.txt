@@ -5,3 +5,5 @@ numpy
 scipy
 plotly
 streamlit-autorefresh
+kaleido
+
