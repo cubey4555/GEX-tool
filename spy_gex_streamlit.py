@@ -183,38 +183,39 @@ SNAPSHOT_DIR = "snapshots"
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 
 # --- Auto-refresh every 1 minute ---
-st_autorefresh(interval=60 * 1000, key="snapshot_refresh")  # 60,000 ms = 1 minute
+st_autorefresh(interval=60 * 1000, key="snapshot_refresh")  # 1 min
 
 # --- Current time and snapshot filename ---
 now = datetime.datetime.now()
-minute_slot = (now.minute // 1) * 1  # 1-minute slot for testing
+minute_slot = (now.minute // 1) * 1  # 1-minute interval for testing
 snapshot_time = now.replace(minute=minute_slot, second=0, microsecond=0)
 
-# Include date in filename so it resets every day
 snapshot_filename = f"{symbol}_{snapshot_time.strftime('%Y%m%d_%H%M')}.csv"
 snapshot_path = os.path.join(SNAPSHOT_DIR, snapshot_filename)
 
-# Only save if it doesn't already exist
+# Save snapshot if it doesn't exist
 if not os.path.exists(snapshot_path):
     df_total.to_csv(snapshot_path, index=False)
 
-# --- Display historical snapshots (only today) ---
+# --- Display today's historical snapshots ---
 st.subheader("📁 Historical GEX Snapshots (Today)")
 snapshot_files = sorted(os.listdir(SNAPSHOT_DIR))
 
 for file in snapshot_files:
-    # Skip snapshots from previous days
-    if not file.startswith(symbol):
+    if not file.startswith(symbol) or not file.endswith(".csv"):
         continue
-    date_str = file.split("_")[1]  # YYYYMMDDHHMM
-    if len(date_str) != 12:
+
+    try:
+        date_str = file.split("_")[1]  # YYYYMMDDHHMM
+        file_datetime = datetime.datetime.strptime(date_str, "%Y%m%d%H%M")
+    except:
         continue  # skip malformed files
 
-    file_date = datetime.datetime.strptime(date_str, "%Y%m%d%H%M")
-    if file_date.date() != now.date():
-        continue  # only show today's snapshots
+    # Only show snapshots from today
+    if file_datetime.date() != now.date():
+        continue
 
-    display_time_str = file_date.strftime("%I:%M %p")  # readable time
+    display_time_str = file_datetime.strftime("%I:%M %p")
 
     df_snapshot = pd.read_csv(os.path.join(SNAPSHOT_DIR, file))
     
@@ -240,6 +241,7 @@ for file in snapshot_files:
         font=dict(color="white")
     )
     st.plotly_chart(fig_snap, use_container_width=True)
+
 
 
 
