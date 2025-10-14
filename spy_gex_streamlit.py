@@ -16,9 +16,6 @@ import plotly.graph_objects as go
 import streamlit as st
 import os
 import datetime
-now = datetime.datetime.now()
-minute_slot = now.minute
-snapshot_time = now.replace(second=0, microsecond=0)
 
 
 st.set_page_config(page_title="SPX/SPY GEX Dashboard", layout="wide")
@@ -177,70 +174,6 @@ st.write(f"Power Zone Band: [{power_lower:.2f}, {power_upper:.2f}]")
 st.write(f"Power Score: {power_score:.2%}")
 st.write(f"Directional Bias: {direction_bias}")
 st.write(f"Predicted Close: {predicted_close:.2f}")
-
-# --- Imports for snapshots ---
-import os
-import datetime
-
-# --- Snapshot folder ---
-SNAPSHOT_DIR = "snapshots"
-os.makedirs(SNAPSHOT_DIR, exist_ok=True)
-
-# --- Save snapshot every interval (1 min for testing) ---
-now = datetime.datetime.now()
-minute_slot = now.minute  # 1-minute interval for testing
-snapshot_time = now.replace(minute=minute_slot, second=0, microsecond=0)
-
-# Include date in filename so it doesn’t overwrite each day
-snapshot_filename = f"{symbol}_{snapshot_time.strftime('%Y%m%d_%H%M')}.csv"
-snapshot_path = os.path.join(SNAPSHOT_DIR, snapshot_filename)
-
-# Only save if it doesn't already exist
-if not os.path.exists(snapshot_path):
-    df_total.to_csv(snapshot_path, index=False)
-
-# --- Display historical snapshots for today only ---
-st.subheader("📁 Historical GEX Snapshots (Today)")
-
-today_str = now.strftime("%Y%m%d")
-snapshot_files = sorted([
-    f for f in os.listdir(SNAPSHOT_DIR)
-    if f.startswith(symbol + "_" + today_str)
-])
-
-for file in snapshot_files:
-    try:
-        time_str = file.split("_")[1].replace(".csv", "")
-        display_time = datetime.datetime.strptime(time_str, "%Y%m%d%H%M")
-        display_time_str = display_time.strftime("%I:%M %p")
-    except:
-        display_time_str = file
-
-    df_snapshot = pd.read_csv(os.path.join(SNAPSHOT_DIR, file))
-
-    fig_snap = go.Figure()
-    colors = ["green" if val >= 0 else "red" for val in df_snapshot["net_gex"]]
-    fig_snap.add_trace(go.Bar(
-        x=df_snapshot["strike"],
-        y=df_snapshot["net_gex"],
-        marker_color=colors
-    ))
-    fig_snap.add_trace(go.Scatter(
-        x=df_snapshot["strike"],
-        y=df_snapshot["abs_gex"],
-        mode="lines+markers",
-        line=dict(color="purple", width=2)
-    ))
-    fig_snap.update_layout(
-        title=f"GEX Snapshot: {display_time_str}",
-        xaxis_title="Strike Price",
-        yaxis_title="GEX / OI",
-        paper_bgcolor="black",
-        plot_bgcolor="black",
-        font=dict(color="white")
-    )
-    st.plotly_chart(fig_snap, use_container_width=True)
-
 
 
 
