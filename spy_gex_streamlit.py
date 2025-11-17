@@ -175,7 +175,7 @@ st.write(f"Power Score: {power_score:.2%}")
 st.write(f"Directional Bias: {direction_bias}")
 st.write(f"Predicted Close: {predicted_close:.2f}")
 
-import streamlit as st
+
 import time
 
 # ---------------------------
