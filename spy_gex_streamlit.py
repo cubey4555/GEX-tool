@@ -23,7 +23,7 @@ st.title("📊 SPX/SPY GEX Dashboard (Interactive)")
 
 # --- User inputs ---
 symbol = st.text_input("Enter ticker symbol (e.g., SPY, TSLA):", value="SPY").upper()
-range_strikes = st.slider("Number of strikes above/below spot to include:", 1, 50, 10)
+range_strikes = st.slider("Number of strikes above/below spot to include:", 1, 100, 15)
 
 # Fetch available expirations
 ticker = yf.Ticker(symbol)
@@ -174,6 +174,66 @@ st.write(f"Power Zone Band: [{power_lower:.2f}, {power_upper:.2f}]")
 st.write(f"Power Score: {power_score:.2%}")
 st.write(f"Directional Bias: {direction_bias}")
 st.write(f"Predicted Close: {predicted_close:.2f}")
+
+import streamlit as st
+import time
+
+# ---------------------------
+# Persistent / session state
+# ---------------------------
+if 'last_oi_snapshot' not in st.session_state:
+    st.session_state.last_oi_snapshot = df_total["total_oi"].sum()
+    st.session_state.start_of_day_oi = df_total["total_oi"].sum()
+    st.session_state.last_display = ""
+    st.session_state.prev_rolling_diff = 0
+    st.session_state.prev_cumulative_diff = 0
+
+# Placeholder for in-place updates
+oi_placeholder = st.empty()
+
+# Auto-update every 5 minutes
+while True:
+    current_oi = df_total["total_oi"].sum()
+
+    # ---------- Rolling change ----------
+    rolling_diff = current_oi - st.session_state.last_oi_snapshot
+    if rolling_diff > 0:
+        rolling_status = f"📈 Rolling OI increased by {rolling_diff:,.0f} → trend strengthening"
+    elif rolling_diff < 0:
+        rolling_status = f"📉 Rolling OI decreased by {abs(rolling_diff):,.0f} → trend weakening"
+    else:
+        rolling_status = "➖ Rolling OI unchanged → no change"
+
+    # ---------- Cumulative change ----------
+    cumulative_diff = current_oi - st.session_state.start_of_day_oi
+    if cumulative_diff > 0:
+        cumulative_status = f"📈 Since-open OI increased by {cumulative_diff:,.0f} → overall strength"
+    elif cumulative_diff < 0:
+        cumulative_status = f"📉 Since-open OI decreased by {abs(cumulative_diff):,.0f} → overall weakening"
+    else:
+        cumulative_status = "➖ Since-open OI unchanged → no change"
+
+    # Combine display with previous values
+    display_text = (
+        f"**Total OI:** {current_oi:,.0f}\n\n"
+        f"- Previous Rolling OI change: {st.session_state.prev_rolling_diff:,.0f}\n"
+        f"- Current Rolling OI change: {rolling_diff:,.0f} → {rolling_status.split('→')[-1].strip()}\n\n"
+        f"- Previous Since-Open OI change: {st.session_state.prev_cumulative_diff:,.0f}\n"
+        f"- Current Since-Open OI change: {cumulative_diff:,.0f} → {cumulative_status.split('→')[-1].strip()}"
+    )
+
+    # Only update if changed
+    if display_text != st.session_state.last_display:
+        oi_placeholder.markdown(display_text)
+        st.session_state.last_display = display_text
+
+    # Update previous values for next iteration
+    st.session_state.prev_rolling_diff = rolling_diff
+    st.session_state.prev_cumulative_diff = cumulative_diff
+    st.session_state.last_oi_snapshot = current_oi
+
+    # Wait 5 minutes
+    time.sleep(300)
 
 
 
