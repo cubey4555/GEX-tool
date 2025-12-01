@@ -41,14 +41,16 @@ st.set_page_config(page_title="SPX/SPY GEX Dashboard", layout="wide")
 st.title("📊 SPX/SPY GEX Dashboard (Interactive)")
 with st.form("gex_form"):
     # Put ALL your inputs inside the form
-    symbol = st.selectbox("Choose symbol:", ["SPY", "SPX"])
-    
-   if symbol_choice == "SPY":
-        yf_symbol = "SPY"      # for price
-        options_symbol = "SPY" # for options
-    elif symbol_choice == "SPX":
-        yf_symbol = "^SPX"      # for price
-        options_symbol = "^SPX" # for options
+# --- Symbol dropdown (no typing) ---
+symbol_choice = st.selectbox("Choose symbol:", ["SPY", "SPX"])
+
+if symbol_choice == "SPY":
+    yf_symbol = "SPY"
+    options_symbol = "SPY"
+
+elif symbol_choice == "SPX":
+    yf_symbol = "^SPX"
+    options_symbol = "^SPX"
 
 
 # Stop execution if the user hasn't pressed the button yet
