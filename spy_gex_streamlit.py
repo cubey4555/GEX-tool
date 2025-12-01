@@ -22,7 +22,13 @@ st.set_page_config(page_title="SPX/SPY GEX Dashboard", layout="wide")
 st.title("📊 SPX/SPY GEX Dashboard (Interactive)")
 
 # --- User inputs ---
-symbol = st.text_input("Enter ticker symbol (e.g., SPY, TSLA):", value="SPY").upper()
+symbol_choice = st.selectbox("Choose symbol:", ["SPY", "SPX"])
+
+# Map dropdown to correct yfinance symbol
+if symbol_choice == "SPY":
+    symbol = "SPY"
+elif symbol_choice == "SPX":
+    symbol = "^SPX"
 range_strikes = st.slider("Number of strikes above/below spot to include:", 1, 100, 15)
 
 # Fetch available expirations
