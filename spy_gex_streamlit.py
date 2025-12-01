@@ -19,15 +19,37 @@ import datetime
 import time
 time.sleep(1)
 
+@st.cache_data(ttl=600)
+def get_expirations(sym):
+    t = yf.Ticker(sym)
+    return t.options
+
+@st.cache_data(ttl=600)
+def get_options(sym, expiry):
+    t = yf.Ticker(sym)
+    chain = t.option_chain(expiry)
+    return chain.calls, chain.puts
+
+@st.cache_data(ttl=600)
+def get_history(sym):
+    t = yf.Ticker(sym)
+    return t.history(period="1d")
+
 
 
 st.set_page_config(page_title="SPX/SPY GEX Dashboard", layout="wide")
 st.title("📊 SPX/SPY GEX Dashboard (Interactive)")
 with st.form("gex_form"):
     # Put ALL your inputs inside the form
-    symbol = st.text_input("Enter ticker symbol (e.g., SPY, TSLA):", value="SPY").upper()
-    range_strikes = st.slider("Number of strikes above/below spot to include:", 1, 100, 15)
-    run = st.form_submit_button("Run GEX")  # this is the submit button
+    symbol = st.selectbox("Choose symbol:", ["SPY", "SPX"])
+    
+   if symbol_choice == "SPY":
+        yf_symbol = "SPY"      # for price
+        options_symbol = "SPY" # for options
+    elif symbol_choice == "SPX":
+        yf_symbol = "^SPX"      # for price
+        options_symbol = "^SPX" # for options
+
 
 # Stop execution if the user hasn't pressed the button yet
 if not run:
@@ -110,7 +132,8 @@ def preprocess_options(df_calls, df_puts):
 df = preprocess_options(calls, puts)
 
 # Auto-spot
-spot = ticker.history(period="1d")["Close"].iloc[-1]
+spot = get_history(yf_symbol)["Close"].iloc[-1]
+
 
 # Filter by strikes around spot
 df = df[(df["strike"] >= spot - range_strikes) & (df["strike"] <= spot + range_strikes)]
