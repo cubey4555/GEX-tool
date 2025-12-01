@@ -24,11 +24,15 @@ time.sleep(1)
 st.set_page_config(page_title="SPX/SPY GEX Dashboard", layout="wide")
 st.title("📊 SPX/SPY GEX Dashboard (Interactive)")
 with st.form("gex_form"):
-symbol = st.text_input("Enter ticker symbol (e.g., SPY, TSLA):", value="SPY").upper()
-range_strikes = st.slider("Number of strikes above/below spot to include:", 1, 100, 15)
-    run = st.form_submit_button("Run GEX")
+    # Put ALL your inputs inside the form
+    symbol = st.text_input("Enter ticker symbol (e.g., SPY, TSLA):", value="SPY").upper()
+    range_strikes = st.slider("Number of strikes above/below spot to include:", 1, 100, 15)
+    run = st.form_submit_button("Run GEX")  # this is the submit button
+
+# Stop execution if the user hasn't pressed the button yet
 if not run:
     st.stop()
+
 
 
 # Fetch available expirations
