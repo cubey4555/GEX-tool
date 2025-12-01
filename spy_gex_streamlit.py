@@ -16,16 +16,26 @@ import plotly.graph_objects as go
 import streamlit as st
 import os
 import datetime
+import time
+time.sleep(1)
+
 
 
 st.set_page_config(page_title="SPX/SPY GEX Dashboard", layout="wide")
 st.title("📊 SPX/SPY GEX Dashboard (Interactive)")
-
+with st.form("gex_form"):
 symbol = st.text_input("Enter ticker symbol (e.g., SPY, TSLA):", value="SPY").upper()
-
 range_strikes = st.slider("Number of strikes above/below spot to include:", 1, 100, 15)
+    run = st.form_submit_button("Run GEX")
+if not run:
+    st.stop()
+
 
 # Fetch available expirations
+@st.cache_data(ttl=300)
+def get_expirations(sym):
+    t = yf.Ticker(sym)
+    return t.options
 ticker = yf.Ticker(symbol)
 st.write("DEBUG — testing options availability...")
 
@@ -36,7 +46,7 @@ except Exception as e:
     st.error(f"YFINANCE ERROR: {e}")
 
 try:
-    expirations = ticker.options
+    expirations = get_expirations(symbol)
 except:
     st.error("Error fetching options expirations. Check symbol.")
     st.stop()
@@ -49,6 +59,7 @@ st.write("Available expirations:", expirations)
 expiry_choice = st.selectbox("Choose expiry (first one is default):", expirations, index=0)
 
 # --- Fetch options for chosen expiry ---
+@st.cache_data(ttl=300)
 def get_options(symbol, expiry):
     ticker = yf.Ticker(symbol)
     chain = ticker.option_chain(expiry)
