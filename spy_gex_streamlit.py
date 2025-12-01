@@ -166,7 +166,10 @@ elif num_red > num_green:
 else:
     direction_bias = "Neutral / Mixed"
 
-predicted_close = np.average(df_total["strike"], weights=df_total["abs_gex"]) if not df_total.empty else None
+if not df_total.empty and df_total["abs_gex"].sum() != 0:
+    predicted_close = np.average(df_total["strike"], weights=df_total["abs_gex"])
+else:
+    predicted_close = None
 
 # --- Plotly chart ---
 colors = ["green" if val >= 0 else "red" for val in df_total["net_gex"]]
