@@ -27,6 +27,14 @@ range_strikes = st.slider("Number of strikes above/below spot to include:", 1, 1
 
 # Fetch available expirations
 ticker = yf.Ticker(symbol)
+st.write("DEBUG — testing options availability...")
+
+try:
+    test_opts = ticker.options
+    st.write("Options found: ", test_opts[:5] if test_opts else "EMPTY LIST")
+except Exception as e:
+    st.error(f"YFINANCE ERROR: {e}")
+
 try:
     expirations = ticker.options
 except:
