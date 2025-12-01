@@ -39,7 +39,6 @@ def get_history(sym):
 
 st.set_page_config(page_title="SPX/SPY GEX Dashboard", layout="wide")
 st.title("📊 SPX/SPY GEX Dashboard (Interactive)")
-with st.form("gex_form"):
     # Put ALL your inputs inside the form
 # --- Symbol dropdown (no typing) ---
     symbol_choice = st.selectbox("Choose symbol:", ["SPY", "SPX"])
@@ -54,9 +53,6 @@ with st.form("gex_form"):
 
 
 # Stop execution if the user hasn't pressed the button yet
-if not run:
-    st.stop()
-
 
 
 # Fetch available expirations
