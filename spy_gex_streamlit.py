@@ -23,7 +23,7 @@ elif symbol_choice == "SPX":
     symbol = "^SPX"
 
 # Default range based on symbol
-default_range = 15 if symbol_choice == "SPY" else 75
+default_range = 15 if symbol_choice == "SPY" else 80
 
 range_strikes = st.slider(
     "Number of strikes above/below spot to include:",
