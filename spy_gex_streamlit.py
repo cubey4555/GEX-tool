@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 import streamlit as st
 import os
 import datetime
+import time
 
 st.set_page_config(page_title="SPX/SPY GEX Dashboard", layout="wide")
 st.title("📊 SPX/SPY GEX Dashboard (Interactive)")
@@ -32,28 +33,38 @@ range_strikes = st.slider(
     default_range
 )
 
-# Fetch available expirations
+# --- Raw Yahoo API Test Button with retries ---
+if st.button("Run Raw Yahoo API Test"):
+    attempts = 3
+    success = False
+    for i in range(attempts):
+        try:
+            ticker_test = yf.Ticker(symbol)
+            expiries_test = ticker_test.options
+            st.write("Attempt", i+1, "Status: Success")
+            st.write("Sample expiries:", expiries_test[:5] if expiries_test else "EMPTY LIST")
+            success = True
+            break
+        except Exception as e:
+            st.write("Attempt", i+1, "Failed:", e)
+            time.sleep(0.5)
+    if not success:
+        st.error("All attempts failed. Yahoo may be overloaded at market open.")
+
+# --- Fetch available expirations with retry ---
 ticker = yf.Ticker(symbol)
-
-st.write("DEBUG — testing options availability...")
-
-try:
-    test_opts = ticker.options
-    st.write("Options found: ", test_opts[:5] if test_opts else "EMPTY LIST")
-except Exception as e:
-    st.error(f"YFINANCE ERROR: {e}")
-
-try:
-    expirations = ticker.options
-except:
-    st.error("Error fetching options expirations. Check symbol.")
-    st.stop()
+expirations = []
+for i in range(3):
+    try:
+        expirations = ticker.options
+        if expirations:
+            break
+    except:
+        time.sleep(0.5)
 
 if not expirations:
     st.warning("No options data available for this symbol.")
     st.stop()
-
-st.write("Available expirations:", expirations)
 
 expiry_choice = st.selectbox("Choose expiry (first one is default):", expirations, index=0)
 
@@ -68,7 +79,7 @@ calls, puts = get_options(symbol, expiry_choice)
 calls["expiry"] = expiry_choice
 puts["expiry"] = expiry_choice
 
-# Combine into single DataFrame
+# --- Preprocess options ---
 def preprocess_options(df_calls, df_puts):
     df_calls.columns = [c.lower().strip() for c in df_calls.columns]
     df_puts.columns = [c.lower().strip() for c in df_puts.columns]
