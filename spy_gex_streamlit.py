@@ -255,3 +255,5 @@ st.write(f"Directional Bias: {direction_bias}")
 
 if predicted_close is not None:
     st.write(f"Predicted Close: {predicted_close:.2f}")
+
+# update number 1
