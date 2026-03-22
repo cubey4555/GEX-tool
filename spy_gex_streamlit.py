@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-
-# spy_gex_streamlit.py
+# goliath_master_terminal.py
 
 import yfinance as yf
 import pandas as pd
@@ -8,67 +7,36 @@ import numpy as np
 from scipy.stats import norm
 import plotly.graph_objects as go
 import streamlit as st
-import os
 import datetime
 import time
 
-st.set_page_config(page_title="SPX/SPY GEX Dashboard", layout="wide")
-st.title("📊 SPX/SPY GEX Dashboard (Interactive)")
+st.set_page_config(page_title="GEX MASTER TERMINAL", layout="wide")
+st.title("📊 GEX Dashboard (Interactive)")
 
-# --- Symbol dropdown (no typing allowed) ---
-symbol_choice = st.selectbox("Choose symbol:", ["SPY", "SPX"])
+# --- 1. Symbol & Strike Settings ---
+symbol_choice = st.selectbox("Choose symbol:", ["SPY", "QQQ", "SPX"])
+ticker_map = {"SPY": "SPY", "QQQ": "QQQ", "SPX": "^SPX"}
+symbol = ticker_map[symbol_choice]
 
-if symbol_choice == "SPY":
-    symbol = "SPY"
-elif symbol_choice == "SPX":
-    symbol = "^SPX"
+default_range = 15 if symbol_choice in ["SPY", "QQQ"] else 80
+range_strikes = st.slider("Strike Window:", 1, 100, default_range)
 
-# Default range based on symbol
-default_range = 15 if symbol_choice == "SPY" else 80
-
-range_strikes = st.slider(
-    "Number of strikes above/below spot to include:",
-    1,
-    100,
-    default_range
-)
-
-# --- Raw Yahoo API Test Button with retries ---
-if st.button("Run Raw Yahoo API Test"):
-    attempts = 3
-    success = False
-    for i in range(attempts):
-        try:
-            ticker_test = yf.Ticker(symbol)
-            expiries_test = ticker_test.options
-            st.write("Attempt", i+1, "Status: Success")
-            st.write("Sample expiries:", expiries_test[:5] if expiries_test else "EMPTY LIST")
-            success = True
-            break
-        except Exception as e:
-            st.write("Attempt", i+1, "Failed:", e)
-            time.sleep(0.5)
-    if not success:
-        st.error("All attempts failed. Yahoo may be overloaded at market open.")
-
-# --- Fetch available expirations with retry ---
+# --- 2. Data Fetching ---
 ticker = yf.Ticker(symbol)
 expirations = []
 for i in range(3):
     try:
         expirations = ticker.options
-        if expirations:
-            break
+        if expirations: break
     except:
         time.sleep(0.5)
 
 if not expirations:
-    st.warning("No options data available for this symbol.")
+    st.warning("No options data available.")
     st.stop()
 
-expiry_choice = st.selectbox("Choose expiry (first one is default):", expirations, index=0)
+expiry_choice = st.selectbox("Choose expiry:", expirations, index=0)
 
-# --- Fetch options for chosen expiry ---
 def get_options(symbol, expiry):
     ticker = yf.Ticker(symbol)
     chain = ticker.option_chain(expiry)
@@ -76,184 +44,118 @@ def get_options(symbol, expiry):
 
 calls, puts = get_options(symbol, expiry_choice)
 
-calls["expiry"] = expiry_choice
-puts["expiry"] = expiry_choice
-
-# --- Preprocess options ---
+# --- 3. Preprocess (Preserving Your Original Logic) ---
 def preprocess_options(df_calls, df_puts):
     df_calls.columns = [c.lower().strip() for c in df_calls.columns]
     df_puts.columns = [c.lower().strip() for c in df_puts.columns]
-
-    df_calls = df_calls.rename(columns={
-        "openinterest": "oi_call",
-        "volume": "vol_call",
-        "impliedvolatility": "iv_call"
-    })
-
-    df_puts = df_puts.rename(columns={
-        "openinterest": "oi_put",
-        "volume": "vol_put",
-        "impliedvolatility": "iv_put"
-    })
-
+    
+    df_calls = df_calls.rename(columns={"openinterest": "oi_call", "volume": "vol_call", "impliedvolatility": "iv_call"})
+    df_puts = df_puts.rename(columns={"openinterest": "oi_put", "volume": "vol_put", "impliedvolatility": "iv_put"})
+    
     df_calls = df_calls[["strike", "oi_call", "vol_call", "iv_call", "lasttradedate"]]
     df_puts  = df_puts[["strike", "oi_put", "vol_put", "iv_put", "lasttradedate"]]
-
+    
     df = pd.merge(df_calls, df_puts, on="strike", suffixes=("_call", "_put"))
-
+    
     for col in ["strike", "iv_call", "oi_call", "iv_put", "oi_put"]:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
-    def fix_iv(iv):
-        if iv > 1:
-            return iv / 100
-        return iv
-
-    df["iv_call"] = df["iv_call"].apply(fix_iv)
-    df["iv_put"]  = df["iv_put"].apply(fix_iv)
-
+    
+    df["iv_call"] = df["iv_call"].apply(lambda x: x/100 if x > 1.5 else x)
+    df["iv_put"]  = df["iv_put"].apply(lambda x: x/100 if x > 1.5 else x)
     return df
 
 df = preprocess_options(calls, puts)
-
-# Auto-spot
 spot = ticker.history(period="1d")["Close"].iloc[-1]
+df = df[(df["strike"] >= spot - range_strikes) & (df["strike"] <= spot + range_strikes)].copy()
 
-# Filter by strikes around spot
-df = df[(df["strike"] >= spot - range_strikes) & (df["strike"] <= spot + range_strikes)]
-
-st.write(f"Spot detected: {spot:.2f}, using ±{range_strikes} strikes")
+# --- VISUAL TABLE (Original) ---
+st.write(f"Spot detected: {spot:.2f}")
 st.dataframe(df.head(20))
 
-# --- Calculate GEX ---
-r = 0.05
-T = 1/252
+# --- 4. THE GOLIATH GREEK ENGINE (Index-Safe) ---
+r, T = 0.05, 1/252
 
-def bs_gamma(S, K, T, r, sigma):
-    if T <= 0 or sigma <= 0:
-        return 0
-    d1 = (np.log(S/K) + (r + 0.5*sigma**2)*T) / (sigma*np.sqrt(T))
-    return norm.pdf(d1) / (S * sigma * np.sqrt(T))
+def calc_alpha_greeks(S, K, T, r, sigma, opt_type='call'):
+    # Safety: If IV is 0 or extremely low, Black-Scholes fails. Return 0s.
+    if T <= 0 or sigma < 0.0001:
+        return [0.0]*7
+    
+    try:
+        d1 = (np.log(S/K) + (r + 0.5*sigma**2)*T) / (sigma*np.sqrt(T))
+        d2 = d1 - sigma*np.sqrt(T)
+        pdf = norm.pdf(d1)
+        
+        gamma = pdf / (S * sigma * np.sqrt(T))
+        vanna = (pdf * d2) / sigma
+        charm = -pdf * (r/(sigma*np.sqrt(T)) - d2/(2*T)) if opt_type=='call' else pdf * (r/(sigma*np.sqrt(T)) - d2/(2*T))
+        speed = -(gamma / S) * (d1 / (sigma * np.sqrt(T)) + 1)
+        vomma = (pdf * d1 * d2) / sigma
+        vera  = S * pdf * np.sqrt(T) * d1
+        delta = norm.cdf(d1) if opt_type=='call' else norm.cdf(d1) - 1
+        
+        return [gamma*100*S**2*0.01, delta*100*S, vanna*100*S, charm*100*S, speed*100*S, vomma*100*S, vera*100*S]
+    except:
+        return [0.0]*7
 
-df["gamma_call"] = df.apply(lambda row: bs_gamma(spot, row["strike"], T, r, row["iv_call"]), axis=1)
-df["gamma_put"]  = df.apply(lambda row: bs_gamma(spot, row["strike"], T, r, row["iv_put"]), axis=1)
+# CRITICAL: We calculate results and force them back into the dataframe using the original index
+c_results = [calc_alpha_greeks(spot, row.strike, T, r, row.iv_call, 'call') for _, row in df.iterrows()]
+p_results = [calc_alpha_greeks(spot, row.strike, T, r, row.iv_put, 'put') for _, row in df.iterrows()]
 
-df["call_gex"] = df["gamma_call"] * df["oi_call"] * 100 * spot
-df["put_gex"]  = -df["gamma_put"] * df["oi_put"] * 100 * spot
+greek_cols = ['GEX', 'DEX', 'Vanna', 'Charm', 'Speed', 'Vomma', 'Vera']
+for i, col in enumerate(greek_cols):
+    df[f'Net_{col}'] = [(c[i] * row.oi_call) - (p[i] * row.oi_put) for (c, p), (_, row) in zip(zip(c_results, p_results), df.iterrows())]
 
-df_total = df.groupby("strike").agg({
-    "call_gex": "sum",
-    "put_gex": "sum",
-    "oi_call": "sum",
-    "oi_put": "sum"
-}).reset_index()
+# --- 5. Chart & Power Zone ---
+df["abs_gex"] = df["Net_GEX"].abs()
+df["total_oi"] = df["oi_call"] + df["oi_put"]
+weights = df["abs_gex"] + 0.25 * df["total_oi"]
 
-df_total["net_gex"]   = df_total["call_gex"] + df_total["put_gex"]
-df_total["abs_gex"]   = df_total["call_gex"].abs() + df_total["put_gex"].abs()
-df_total["total_oi"]  = df_total["oi_call"] + df_total["oi_put"]
-
-total_gamma_abs = df_total["abs_gex"].sum()
-total_net_gamma = df_total["net_gex"].sum()
-
-# --- Power Zone ---
-abs_gex_sum = df_total["abs_gex"].sum()
-oi_sum = df_total["total_oi"].sum()
-
-alpha = 0.25
-weights = df_total["abs_gex"] + alpha * df_total["total_oi"]
-weights = weights if weights.sum() != 0 else pd.Series(1.0, index=df_total.index)
-
-power_center = (df_total["strike"] * weights).sum() / weights.sum()
-var = ((weights * (df_total["strike"] - power_center) ** 2).sum()) / weights.sum()
-power_std = np.sqrt(var)
-
-k = 1.0
-power_lower = power_center - k * power_std
-power_upper = power_center + k * power_std
-
-inside_mask = (df_total["strike"] >= power_lower) & (df_total["strike"] <= power_upper)
-power_score = weights[inside_mask].sum() / weights.sum()
-
-# --- Directional bias & predicted close ---
-num_green = (df_total["net_gex"] > 0).sum()
-num_red   = (df_total["net_gex"] < 0).sum()
-
-if num_green > num_red:
-    direction_bias = "Slightly Bullish"
-elif num_red > num_green:
-    direction_bias = "Slightly Bearish"
+if weights.sum() > 0:
+    p_center = (df["strike"] * weights).sum() / weights.sum()
+    p_std = np.sqrt(((weights * (df["strike"] - p_center) ** 2).sum()) / weights.sum())
+    p_low, p_high = p_center - p_std, p_center + p_std
 else:
-    direction_bias = "Neutral / Mixed"
-
-if not df_total.empty and df_total["abs_gex"].sum() != 0:
-    predicted_close = np.average(df_total["strike"], weights=df_total["abs_gex"])
-else:
-    predicted_close = None
-
-# --- Plotly chart ---
-colors = ["green" if val >= 0 else "red" for val in df_total["net_gex"]]
+    p_center, p_low, p_high = spot, spot-1, spot+1
 
 fig = go.Figure()
-
 fig.add_trace(go.Bar(
-    x=df_total["strike"],
-    y=df_total["net_gex"],
-    name="Net GEX",
-    marker_color=colors
+    x=df["strike"], 
+    y=df["Net_GEX"], 
+    marker_color=["green" if x>=0 else "red" for x in df["Net_GEX"]],
+    name="Net GEX"
 ))
-
-fig.add_trace(go.Scatter(
-    x=df_total["strike"],
-    y=df_total["abs_gex"],
-    mode="lines+markers",
-    name="Abs GEX",
-    line=dict(color="purple", width=2)
-))
-
-fig.add_vline(
-    x=spot,
-    line=dict(color="yellow", width=2, dash="dash"),
-    annotation_text="Spot",
-    annotation_position="top"
-)
-
-fig.add_vrect(
-    x0=power_lower,
-    x1=power_upper,
-    fillcolor="purple",
-    opacity=0.15,
-    layer="below",
-    line_width=0
-)
-
-fig.add_vline(
-    x=power_center,
-    line=dict(color="magenta", width=2, dash="dashdot"),
-    annotation_text="Power Zone",
-    annotation_position="top"
-)
-
-fig.update_layout(
-    title=f"{symbol} GEX Dashboard",
-    xaxis_title="Strike Price",
-    yaxis_title="GEX / OI",
-    paper_bgcolor="black",
-    plot_bgcolor="black",
-    font=dict(color="white")
-)
-
+fig.add_vline(x=spot, line=dict(color="yellow", dash="dash"), annotation_text="Spot")
+fig.add_vrect(x0=p_low, x1=p_high, fillcolor="purple", opacity=0.15, line_width=0)
+fig.update_layout(template="plotly_dark", title=f"{symbol} GEX Roadmap", xaxis_title="Strike")
 st.plotly_chart(fig, use_container_width=True)
 
-# --- Summary metrics ---
-st.subheader("Summary Metrics")
-st.write(f"Total Abs Gamma: {total_gamma_abs:,.0f}")
-st.write(f"Total Net Gamma: {total_net_gamma:,.0f}")
-st.write(f"Power Zone Center: {power_center:.2f}")
-st.write(f"Power Zone Band: [{power_lower:.2f}, {power_upper:.2f}]")
-st.write(f"Power Score: {power_score:.2%}")
-st.write(f"Directional Bias: {direction_bias}")
+# --- 6. ALPHA COMMAND CENTER ---
+st.divider()
+st.subheader("🕹️ ALPHA COMMAND CENTER")
 
-if predicted_close is not None:
-    st.write(f"Predicted Close: {predicted_close:.2f}")
+# Format for AI - Final cleanup to ensure no NaNs reach the prompt
+ai_df = df[['strike', 'Net_GEX', 'Net_DEX', 'Net_Vanna', 'Net_Charm', 'Net_Speed', 'Net_Vomma', 'Net_Vera']].copy()
+for col in [c for c in ai_df.columns if 'Net_' in c]:
+    ai_df[col] = ai_df[col].apply(lambda x: f"{(x / 1e6):.2f}M" if not np.isnan(x) else "0.00M")
 
-# update number 1
+master_prompt = f"""
+[ROLE]: Senior 0DTE Alpha Strategist. Asset: {symbol_choice} | Spot: {spot:.2f}
+[POWER ZONE]: {p_low:.2f} - {p_high:.2f} (Center: {p_center:.2f})
+
+[THE DATA FEED]:
+{ai_df.head(15).to_string(index=False)}
+
+[YOUR STRATEGIC MANDATE]:
+1. **THE LINES IN THE SAND**: Identify the Goliath Floor, the Magnet Pivot, and the Ceiling.
+2. **DIRECTIONAL VERDICT**: Look at Net_DEX and Net_GEX. Are we in "Accelerated Gravity" (Negative GEX) or "Mean Reversion" (Positive GEX)?
+3. **THE ROADMAP**: Give me the "If/Then" steps for the day.
+4. **VOLATILITY CHECK**: Is Net_Speed or Net_Vera signaling an explosive move coming?
+"""
+
+col1, col2 = st.columns(2)
+with col1:
+    st.info("Strategy Alpha Prompt")
+    st.code(master_prompt, language="text")
+with col2:
+    st.info("Full Raw Greek Table")
+    st.code(ai_df.to_string(index=False), language="text")
