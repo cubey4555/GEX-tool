@@ -139,17 +139,38 @@ for col in [c for c in ai_df.columns if 'Net_' in c]:
     ai_df[col] = ai_df[col].apply(lambda x: f"{(x / 1e6):.2f}M" if not np.isnan(x) else "0.00M")
 
 master_prompt = f"""
-[ROLE]: Senior 0DTE Alpha Strategist. Asset: {symbol_choice} | Spot: {spot:.2f}
-[POWER ZONE]: {p_low:.2f} - {p_high:.2f} (Center: {p_center:.2f})
+[ROLE]: You are the Senior 0DTE Alpha Strategist. I am the execution trader. 
+Analyze this raw Greek tape for {symbol_choice} (Spot: {spot:.2f}).
 
 [THE DATA FEED]:
 {ai_df.head(15).to_string(index=False)}
 
+[POWER ZONE]: {p_low:.2f} - {p_high:.2f} (Center: {p_center:.2f})
+
 [YOUR STRATEGIC MANDATE]:
-1. **THE LINES IN THE SAND**: Identify the Goliath Floor, the Magnet Pivot, and the Ceiling.
-2. **DIRECTIONAL VERDICT**: Look at Net_DEX and Net_GEX. Are we in "Accelerated Gravity" (Negative GEX) or "Mean Reversion" (Positive GEX)?
-3. **THE ROADMAP**: Give me the "If/Then" steps for the day.
-4. **VOLATILITY CHECK**: Is Net_Speed or Net_Vera signaling an explosive move coming?
+1. **DIRECTIONAL POLARITY**: 
+   - Compare Spot ({spot:.2f}) to the Power Zone Center ({p_center:.2f}). 
+   - Are we in a "Bullish Expansion" (Spot > Center with Positive GEX) or a "Bearish Trap" (Spot < Center with Deepening Negative GEX)? 
+   - Give a definitive Lean: BULLISH, BEARISH, or NEUTRAL/CHOP.
+
+2. **THE LINES IN THE SAND**: 
+   - **Goliath Floor**: The strike with the largest Negative Net_GEX (The "Wall").
+   - **Magnet Pivot**: The high-volume Net_DEX strike that price is gravitating toward.
+   - **The Ceiling**: The strike where GEX flips positive or where DEX friction is highest.
+
+3. **MARKET DYNAMICS**: 
+   - Analyze the "Accelerated Gravity" vs. "Mean Reversion." 
+   - If GEX is deep negative across the board, explain the "Slippage Risk" if the Goliath Floor breaks.
+
+4. **THE ROADMAP (TIMED)**: 
+   - **9:30-10:30 (Opening Vol)**: What is the primary risk at the open?
+   - **10:30-1:00 (The Grind)**: Where is the Magnet Pivot pulling us?
+   - **1:00-4:00 (0DTE Gamma Decay)**: How will the end-of-day delta hedging affect price?
+
+5. **VOLATILITY CHECK**: 
+   - Use Net_Speed and Net_Vera. If these are spiking at a specific strike, is a "Gamma Squeeze" or "Liquidity Hole" imminent?
+
+[THINK FREELY]: Use the Greeks to spot the fakeouts. If Spot is bouncing but Vanna is deep negative, tell me it's a "Dead Cat Bounce" and dealers will sell into it.
 """
 
 col1, col2 = st.columns(2)
