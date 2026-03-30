@@ -172,7 +172,7 @@ Analyze this raw Greek tape for {symbol_choice} (Spot: {spot:.2f}).
 
 [THINK FREELY]: Use the Greeks to spot the fakeouts. If Spot is bouncing but Vanna is deep negative, tell me it's a "Dead Cat Bounce" and dealers will sell into it.
 6. 
-    - look at all the greeks and determine the most levels that price will bounce off of and pivot off. make sure you look at put call walls and filter them out using the other greeks to find the best ones that price will pivot from and list them. make sure its in a list format and give the reason behind the level and what price will do at the pivot level. also make sure its put and call walls so gamma walls so make sure it is just a whole number. format should be like this: whole number put wall - reasoning behind it - what price will do. do this for all imporant pivots. 
+    - look at all the greeks and determine the most levels that price will bounce off of and pivot off. make sure you look at put call walls and filter them out using the other greeks to find the best ones that price will pivot from and list them. make sure its in a list format and give the reason behind the level and what price will do at the pivot level. also make sure its put and call walls so gamma walls so make sure it is just a whole number. format should be like this: whole number put wall - reasoning behind it - what price will do. do this for all imporant pivots. and remember make sure the greeks back up the level.  
 """
 
 col1, col2 = st.columns(2)
