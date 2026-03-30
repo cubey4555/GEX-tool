@@ -171,6 +171,8 @@ Analyze this raw Greek tape for {symbol_choice} (Spot: {spot:.2f}).
    - Use Net_Speed and Net_Vera. If these are spiking at a specific strike, is a "Gamma Squeeze" or "Liquidity Hole" imminent?
 
 [THINK FREELY]: Use the Greeks to spot the fakeouts. If Spot is bouncing but Vanna is deep negative, tell me it's a "Dead Cat Bounce" and dealers will sell into it.
+6. 
+    - look at all the greeks and determine the most levels that price will bounce off of and pivot off. make sure you look at put call walls and filter them out using the other greeks to find the best ones that price will pivot from and list them. 
 """
 
 col1, col2 = st.columns(2)
