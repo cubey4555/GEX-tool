@@ -11,7 +11,7 @@ import datetime
 import time
 
 st.set_page_config(page_title="GEX MASTER TERMINAL", layout="wide")
-st.title("📊 GEX Dashboard (Interactive)")
+st.title("Cubeys GEX)
 
 # Placeholder rendered immediately after title — filled with TV string once data is ready
 tv_string_placeholder = st.empty()
