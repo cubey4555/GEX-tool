@@ -11,7 +11,7 @@ import datetime
 import time
 
 st.set_page_config(page_title="GEX MASTER TERMINAL", layout="wide")
-st.title("Cubeys GEX")
+st.title("Cubey's GEX")
 
 # Placeholder rendered immediately after title — filled with TV string once data is ready
 tv_string_placeholder = st.empty()
@@ -181,13 +181,7 @@ _vera_scaled     = (df_total['Net_Vanna'].abs() / _vera_abs_max * _gex_scale).va
 bar_colors = ['rgba(30,100,255,0.85)' if v >= 0 else 'rgba(220,50,50,0.75)' for v in df_total['net_gex']]
 
 # Power Zone (kept from original)
-weights = df["abs_gex"] + 0.25 * df["total_oi"]
-if weights.sum() > 0:
-    p_center = (df["strike"] * weights).sum() / weights.sum()
-    p_std = np.sqrt(((weights * (df["strike"] - p_center) ** 2).sum()) / weights.sum())
-    p_low, p_high = p_center - p_std, p_center + p_std
-else:
-    p_center, p_low, p_high = spot, spot-1, spot+1
+
 
 fig = go.Figure()
 
@@ -234,7 +228,6 @@ fig.add_trace(go.Scatter(
 
 # Spot line & Power Zone band
 fig.add_vline(x=spot, line=dict(color="yellow", dash="dash"), annotation_text="Spot")
-fig.add_vrect(x0=p_low, x1=p_high, fillcolor="purple", opacity=0.15, line_width=0)
 
 # Sigma level lines
 min_y = df_total['net_gex'].min()
@@ -250,6 +243,8 @@ fig.update_layout(
     xaxis_title="Strike",
     plot_bgcolor='#0a0a0a', paper_bgcolor='#0a0a0a',
     hovermode='x unified', height=550,
+    yaxis=dict(showgrid=False, zeroline=True, zerolinecolor='white', zerolinewidth=1),
+    xaxis=dict(showgrid=False),
     legend=dict(bgcolor='rgba(10,10,10,0.8)', bordercolor='rgba(255,255,255,0.2)', x=0.78, y=0.99)
 )
 st.plotly_chart(fig, use_container_width=True)
@@ -293,7 +288,7 @@ st.write(f"**{symbol_choice}** Spot: `{spot:.2f}` | Expected Move: ±`{em_data['
          f"1.0σ: [{em_data['1.0_Std_Lower']:.2f}–{em_data['1.0_Std_Upper']:.2f}] | "
          f"1.5σ: [{em_data['1.5_Std_Lower']:.2f}–{em_data['1.5_Std_Upper']:.2f}] | "
          f"2.0σ: [{em_data['2.0_Std_Lower']:.2f}–{em_data['2.0_Std_Upper']:.2f}]")
-st.caption("Inertia = proximity + volume score 0–100 | VannaPress = IV-forced hedge score 0–100")
+st.markdown("<span style='color:white;font-size:12px;'>Inertia = proximity + volume score 0–100 | VannaPress = IV-forced hedge score 0–100</span>", unsafe_allow_html=True)
 
 # Format for display
 display_view = final_view.copy()
@@ -335,7 +330,7 @@ tv_data_string = f"EM1:{em_1_sigma:.4f}:EM2:{em_2_sigma:.4f}," + ",".join(wall_o
 with tv_string_placeholder.container():
     st.subheader("📈 TRADINGVIEW DATA STRING")
     st.code(tv_data_string, language="text")
-    st.caption("Copy this string into your TradingView indicator input field.")
+    st.markdown("<span style='color:white;font-size:12px;'>Copy this string into your TradingView indicator input field.</span>", unsafe_allow_html=True)
     st.divider()
 
 # --- 8. ALPHA COMMAND CENTER ---
@@ -354,12 +349,9 @@ Analyze this raw Greek tape for {symbol_choice} (Spot: {spot:.2f}).
 [THE DATA FEED]:
 {ai_df.head(15).to_string(index=False)}
 
-[POWER ZONE]: {p_low:.2f} - {p_high:.2f} (Center: {p_center:.2f})
-
 [YOUR STRATEGIC MANDATE]:
 1. **DIRECTIONAL POLARITY**: 
-   - Compare Spot ({spot:.2f}) to the Power Zone Center ({p_center:.2f}). 
-   - Are we in a "Bullish Expansion" (Spot > Center with Positive GEX) or a "Bearish Trap" (Spot < Center with Deepening Negative GEX)? 
+   - Is Net_GEX predominantly positive (dealers long gamma = price pinning) or negative (dealers short gamma = trending/volatile)?
    - Give a definitive Lean: BULLISH, BEARISH, or NEUTRAL/CHOP.
 
 2. **THE LINES IN THE SAND**: 
