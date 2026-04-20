@@ -11,13 +11,74 @@ import datetime
 import time
 
 st.set_page_config(page_title="GEX MASTER TERMINAL", layout="wide")
-st.title("Cubey's GEX")
+st.title("📊 GEX Dashboard (Interactive)")
+
+def get_vix():
+    try:
+        vix_ticker = yf.Ticker("^VIX")
+        vix_data = vix_ticker.history(period="1d")
+        if not vix_data.empty:
+            return vix_data['Close'].iloc[-1] / 100
+    except:
+        pass
+    return None
+
+def get_strategic_analysis(master_df, spot_price, current_vix):
+    total_gex   = pd.to_numeric(master_df['Net_GEX'].str.replace('M', ''), errors='coerce').sum()
+    total_dex   = pd.to_numeric(master_df['Net_DEX'].str.replace('M', ''), errors='coerce').sum()
+    total_vanna = pd.to_numeric(master_df['Net_Vanna'].str.replace('M', ''), errors='coerce').sum()
+    total_charm = pd.to_numeric(master_df['Net_Charm'].str.replace('M', ''), errors='coerce').sum()
+
+    score = 0
+    score += 2 if total_gex   > 0 else -2
+    score += 3 if total_dex   > 0 else -3
+    score += 1 if total_vanna > 0 else -1
+    score += 1 if total_charm > 0 else -1
+
+    if score >= 5:    bias = "🔥 STRONG BULLISH (Full Confluence)"
+    elif score > 0:   bias = "📈 MODERATE BULLISH"
+    elif score <= -5: bias = "💀 STRONG BEARISH (Crash Gravity)"
+    else:             bias = "📉 MODERATE BEARISH"
+
+    vix_pct = (current_vix * 100) if current_vix else 15.0
+    if vix_pct > 22:   regime = "HIGH VOL (Gamma Flush Risk)"
+    elif vix_pct < 13: regime = "LOW VOL (Melt-Up/Squeeze)"
+    else:              regime = "BALANCED (Range Bound)"
+
+    unusual_strikes = []
+    for _, row in master_df.iterrows():
+        vol = row['Vol_C'] + row['Vol_P']
+        oi  = row['OI_C']  + row['OI_P']
+        if oi > 500 and vol > (oi * 25):
+            side = "CALLS" if row['Vol_C'] > row['Vol_P'] else "PUTS"
+            intensity = vol / oi
+            unusual_strikes.append(f"STRIKE {row['Strike']}: {side} ({intensity:.1f}x OI)")
+
+    return bias, regime, unusual_strikes, score
 
 # Placeholder rendered immediately after title — filled with TV string once data is ready
 tv_string_placeholder = st.empty()
 
+# --- BIAS PANEL PLACEHOLDER (filled after data loads) ---
+bias_placeholder = st.empty()
+
 # --- 1. Symbol & Strike Settings ---
 symbol_choice = st.selectbox("Choose symbol:", ["SPY", "QQQ", "SPX"])
+
+# --- VIX / IV MODE ---
+vix_mode = st.selectbox("Volatility Mode:", ["Live IV (from options chain)", "Manual IV / VIX Fallback"])
+manual_iv = None
+vix_val = get_vix()
+if vix_mode == "Manual IV / VIX Fallback":
+    if vix_val is not None:
+        use_vix = st.selectbox(f"VIX is currently {vix_val*100:.2f}%. Use as fallback IV?", ["Yes — use VIX", "No — enter manually"])
+        if use_vix == "Yes — use VIX":
+            manual_iv = vix_val
+            st.markdown(f"<span style='color:white;font-size:12px;'>Using VIX ({vix_val*100:.2f}%) as IV fallback.</span>", unsafe_allow_html=True)
+        else:
+            manual_iv = st.number_input("Enter Manual IV (e.g. 0.165 for 16.5%):", min_value=0.01, max_value=2.0, value=0.165, step=0.005)
+    else:
+        manual_iv = st.number_input("Enter Manual IV (e.g. 0.165 for 16.5%):", min_value=0.01, max_value=2.0, value=0.165, step=0.005)
 ticker_map = {"SPY": "SPY", "QQQ": "QQQ", "SPX": "^SPX"}
 symbol = ticker_map[symbol_choice]
 
@@ -48,7 +109,7 @@ def get_options(symbol, expiry):
 calls, puts = get_options(symbol, expiry_choice)
 
 # --- 3. Preprocess (Preserving Your Original Logic) ---
-def preprocess_options(df_calls, df_puts):
+def preprocess_options(df_calls, df_puts, manual_iv=None):
     df_calls.columns = [c.lower().strip() for c in df_calls.columns]
     df_puts.columns = [c.lower().strip() for c in df_puts.columns]
     
@@ -62,12 +123,17 @@ def preprocess_options(df_calls, df_puts):
     
     for col in ["strike", "iv_call", "oi_call", "iv_put", "oi_put"]:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-    
-    df["iv_call"] = df["iv_call"].apply(lambda x: x/100 if x > 1.5 else x)
-    df["iv_put"]  = df["iv_put"].apply(lambda x: x/100 if x > 1.5 else x)
+
+    def fix_iv(iv):
+        if manual_iv is not None:
+            return manual_iv
+        return iv/100 if iv > 1.5 else iv
+
+    df["iv_call"] = df["iv_call"].apply(fix_iv)
+    df["iv_put"]  = df["iv_put"].apply(fix_iv)
     return df
 
-df = preprocess_options(calls, puts)
+df = preprocess_options(calls, puts, manual_iv=manual_iv)
 spot = ticker.history(period="1d")["Close"].iloc[-1]
 df = df[(df["strike"] >= spot - range_strikes) & (df["strike"] <= spot + range_strikes)].copy()
 
@@ -305,6 +371,21 @@ display_view.columns = [
 ]
 st.dataframe(display_view, use_container_width=True)
 
+# --- RENDER BIAS PANEL (fills placeholder above symbol selector) ---
+vix_for_bias = vix_val if vix_val else None
+m_bias, m_regime, m_flow, m_score = get_strategic_analysis(display_view, spot, vix_for_bias)
+bias_color = "#00ff00" if "BULLISH" in m_bias else "#ff4444" if "BEARISH" in m_bias else "#ffaa00"
+with bias_placeholder.container():
+    st.markdown(f"""
+    <div style="padding:12px 20px; border:2px solid {bias_color}; border-radius:10px; background:#0a0a0a; margin-bottom:8px;">
+        <span style="color:{bias_color}; font-size:1.1em; font-weight:bold;">🛡️ ALPHA BIAS: {m_bias}</span>
+        &nbsp;&nbsp;|&nbsp;&nbsp;
+        <span style="color:#0088ff;">REGIME: {m_regime}</span>
+        &nbsp;&nbsp;|&nbsp;&nbsp;
+        <span style="color:#aaa;">Score: {m_score} | VIX: {f"{vix_for_bias*100:.2f}%" if vix_for_bias else "N/A"}</span>
+    </div>
+    """, unsafe_allow_html=True)
+
 # --- 7. TRADINGVIEW DATA STRING ---
 master_profile['Wall_Score'] = master_profile['Net_GEX'].abs() * (
     master_profile['strike'].map(final_view.set_index('strike')['Inertia']).fillna(0) / 100
@@ -406,3 +487,12 @@ with rank_col3:
     st.markdown("**🔥 Overall Power Ranking**")
     for i, (idx, row) in enumerate(top_overall.iterrows()):
         st.metric(label=f"OVERALL {i+1} | Strike {row['strike']:.2f}", value=f"Score: {row['Wall_Score']:.0f}")
+
+# --- 10. UNUSUAL FLOW RADAR ---
+st.divider()
+st.subheader("⚠️ UNUSUAL FLOW RADAR")
+if m_flow:
+    for item in m_flow:
+        st.markdown(f"<span style='color:#00ff00; font-family:monospace;'>• {item}</span>", unsafe_allow_html=True)
+else:
+    st.markdown("<span style='color:white;'>Normal — No Unusual Flow Detected</span>", unsafe_allow_html=True)
